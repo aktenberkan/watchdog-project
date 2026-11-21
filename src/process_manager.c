@@ -75,7 +75,22 @@ static int spawn_worker(size_t index, int is_restart)
     }
 
     if (child_pid == 0) {
-        (void)fflush(NULL);
+    sigset_t child_mask;
+
+    if (sigemptyset(&child_mask) == -1 ||
+        sigprocmask(SIG_SETMASK, &child_mask, NULL) == -1) {
+
+        static const char error_message[] =
+            "watchdog: failed to reset child signal mask\n";
+
+        (void)write(STDERR_FILENO,
+                    error_message,
+                    sizeof(error_message) - 1);
+
+        _exit(127);
+    }
+
+    (void)fflush(NULL);
 
         if (test_duration != NULL && test_duration[0] != '\0') {
             execl(WORKER_EXECUTABLE,
