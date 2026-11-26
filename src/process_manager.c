@@ -30,6 +30,22 @@ static void log_event(const char *event,
     (void)logger_event(event, name, pid, details);
 }
 
+static void write_child_error(const char *message, size_t length)
+{
+    while (length > 0) {
+        ssize_t written = write(STDERR_FILENO, message, length);
+
+        if (written > 0) {
+            message += written;
+            length -= (size_t)written;
+        } else if (written == -1 && errno == EINTR) {
+            continue;
+        } else {
+            break;
+        }
+    }
+}
+
 static int spawn_worker(size_t index, int is_restart)
 {
     process_info_t *process = &processes[index];
@@ -83,9 +99,7 @@ static int spawn_worker(size_t index, int is_restart)
         static const char error_message[] =
             "watchdog: failed to reset child signal mask\n";
 
-        (void)write(STDERR_FILENO,
-                    error_message,
-                    sizeof(error_message) - 1);
+        write_child_error(error_message, sizeof(error_message) - 1);
 
         _exit(127);
     }
@@ -108,8 +122,7 @@ static int spawn_worker(size_t index, int is_restart)
         {
             static const char exec_error_message[] =
                 "watchdog: exec ./worker failed\n";
-            (void)write(STDERR_FILENO, exec_error_message,
-                        sizeof(exec_error_message) - 1);
+            write_child_error(exec_error_message, sizeof(exec_error_message) - 1);
         }
         _exit(127);
     }
